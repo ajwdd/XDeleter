@@ -3,7 +3,7 @@
 //  \  /| | | |/ _ \ |/ _ \ __/ _ \ '__|
 //  /  \| |_| |  __/ |  __/ ||  __/ |
 // /_/\_\____/ \___|_|\___|\__\___|_|
-//     https://github.com/ajwdd
+// v1.0.1    https://github.com/ajwdd
 
 // DON'T EDIT THIS FILE DIRECTLY!
 (function () {
@@ -15,10 +15,12 @@
   let ua = "";
   let language_code = "";
 
+  // Configuration for deletion criteria
   let delete_options = {
     unretweet: true,
     do_not_remove_pinned_tweet: true,
     delete_message_with_url_only: false,
+    delete_tweets_without_media: false,
     delete_specific_ids_only: [""],
     match_any_keywords: [""],
     tweets_to_ignore: [],
@@ -31,15 +33,16 @@
   const delete_tweet_transaction_id =
     "LuSa1GYxAMxWEugf+FtQ/wjCAUkipMAU3jpjkil3ujj7oq6munDCtNaMaFmZ8bcm7CaNvi4GIXj32jp7q32nZU8zc5CyLw";
 
+  // Runtime variables
   let tweets_to_delete = [];
   let stop_signal = false;
   let is_processing = false;
 
-  // Local Storage Keys
   const IGNORE_IDS_STORAGE_KEY = "xdeleter_ignore_ids";
   const BEARER_TOKEN_STORAGE_KEY = "xdeleter_bearer_token";
-  const USERNAME_STORAGE_KEY = "xdeleter_username"; // New key for Username
+  const USERNAME_STORAGE_KEY = "xdeleter_username";
 
+  // UI Element Variables
   let uiContainer,
     logAreaElement,
     authTokenInput,
@@ -48,6 +51,7 @@
     unretweetCheckbox,
     keepPinnedCheckbox,
     urlOnlyCheckbox,
+    deleteWithoutMediaCheckbox,
     keywordsInput,
     ignoreIdsInput,
     afterDateInput,
@@ -57,6 +61,7 @@
     stopButton,
     closeButton;
 
+  // CSS styles for the UI
   const styles = `
         :root {
             --xdeleter-primary-color: #1DA1F2;
@@ -76,7 +81,7 @@
         }
         .xdeleter-ui-container {
             position: fixed; top: 20px; right: 20px; width: 380px;
-            max-height: 90vh; overflow-y: auto; overflow-x: hidden;
+            max-height: calc(100vh - 40px); overflow-y: auto; overflow-x: hidden; /* Adjusted max-height */
             background-color: var(--xdeleter-bg-color); color: var(--xdeleter-text-color);
             padding: 20px; border-radius: var(--xdeleter-border-radius); z-index: 100001;
             font-family: var(--xdeleter-font-family);
@@ -88,6 +93,7 @@
         .xdeleter-ui-container h2, .xdeleter-ui-container h3 {
             color: var(--xdeleter-primary-color); text-align: center; margin-bottom: 15px;
         }
+        .xdeleter-ui-container h2 { font-size: 1.4em; }
         .xdeleter-ui-container h3 {
             margin-top: 20px; border-bottom: 1px solid var(--xdeleter-border-color);
             padding-bottom: 8px; font-size: 1.1em;
@@ -139,7 +145,7 @@
 
         .xdeleter-log-area {
             background-color: rgba(0,0,0,0.25); border: 1px solid var(--xdeleter-border-color);
-            border-radius: 6px; padding: 10px; min-height: 100px; max-height: 250px;
+            border-radius: 6px; padding: 10px; min-height: 100px; max-height: 250px; /* Ensure log area is scrollable */
             overflow-y: auto; font-size: 12px; line-height: 1.6; white-space: pre-wrap;
             word-break: break-word;
         }
@@ -167,7 +173,7 @@
   function buildAcceptLanguageString() {
     const languages = navigator.languages;
     if (!languages || languages.length === 0) {
-      return "en-US,en;q=0.9";
+      return "en-US,en;q=0.9"; // Default fallback
     }
     let q = 1;
     const decrement = 0.1;
@@ -193,7 +199,7 @@
         logEntry.style.fontWeight = "bold";
       }
       logAreaElement.appendChild(logEntry);
-      logAreaElement.scrollTop = logAreaElement.scrollHeight;
+      logAreaElement.scrollTop = logAreaElement.scrollHeight; // Auto-scroll to bottom
     }
     if (isError) {
       console.error(message);
@@ -212,12 +218,18 @@
     styleSheet.innerText = styles;
     document.head.appendChild(styleSheet);
 
+    // Main UI structure
     uiContainer.innerHTML = `
             <span id="xdeleter-close-btn" class="xdeleter-ui-close-btn">&times;</span>
             <h2>XDeleter</h2>
-            <h2>https://github.com/ajwdd</h2>
+            <p style="text-align:center; font-size: 0.8em; margin-top:-10px; margin-bottom:15px;">
+                <a href="https://github.com/ajwdd" target="_blank" style="color: var(--xdeleter-primary-color); text-decoration:none;">
+                    github.com/ajwdd
+                </a>
+            </p>
         `;
 
+    // Authentication section
     const authSection = document.createElement("div");
     authSection.className = "xdeleter-section";
     authSection.innerHTML = `
@@ -237,6 +249,7 @@
         `;
     uiContainer.appendChild(authSection);
 
+    // Deletion options section
     const optionsSection = document.createElement("div");
     optionsSection.className = "xdeleter-section";
     optionsSection.innerHTML = `
@@ -249,6 +262,8 @@
             </div>
             <div class="xdeleter-option-group">
                 <label><input type="checkbox" id="xdeleter-url-only">Delete Tweets with Links Only</label>
+            </div>
+            <div class="xdeleter-option-group"> <label><input type="checkbox" id="xdeleter-no-media-only">Delete Tweets without Media Only</label>
             </div>
             <div class="xdeleter-input-group">
                 <label for="xdeleter-keywords">Delete if Keywords Match (comma-separated):</label>
@@ -273,6 +288,7 @@
         `;
     uiContainer.appendChild(optionsSection);
 
+    // Control buttons
     const buttonsGroup = document.createElement("div");
     buttonsGroup.className = "xdeleter-button-group";
     buttonsGroup.innerHTML = `
@@ -281,6 +297,7 @@
         `;
     uiContainer.appendChild(buttonsGroup);
 
+    // Log area
     const logSection = document.createElement("div");
     logSection.className = "xdeleter-section";
     logSection.innerHTML = `
@@ -291,6 +308,7 @@
 
     document.body.appendChild(uiContainer);
 
+    // Assign UI elements to variables
     logAreaElement = document.getElementById("xdeleter-log-area");
     authTokenInput = document.getElementById("xdeleter-auth-token");
     clientIdInput = document.getElementById("xdeleter-client-id");
@@ -298,6 +316,9 @@
     unretweetCheckbox = document.getElementById("xdeleter-unretweet");
     keepPinnedCheckbox = document.getElementById("xdeleter-keep-pinned");
     urlOnlyCheckbox = document.getElementById("xdeleter-url-only");
+    deleteWithoutMediaCheckbox = document.getElementById(
+      "xdeleter-no-media-only"
+    );
     keywordsInput = document.getElementById("xdeleter-keywords");
     ignoreIdsInput = document.getElementById("xdeleter-ignore-ids");
     afterDateInput = document.getElementById("xdeleter-after-date");
@@ -307,6 +328,7 @@
     stopButton = document.getElementById("xdeleter-stop-btn");
     closeButton = document.getElementById("xdeleter-close-btn");
 
+    // Load saved settings from local storage
     const storedIgnoreIds = localStorage.getItem(IGNORE_IDS_STORAGE_KEY);
     if (storedIgnoreIds) {
       ignoreIdsInput.value = storedIgnoreIds;
@@ -317,7 +339,6 @@
       authTokenInput.value = storedBearerToken;
       logToUI("Loaded Bearer Token from local storage.");
     }
-    // Load Username from local storage
     const storedUsername = localStorage.getItem(USERNAME_STORAGE_KEY);
     if (storedUsername) {
       usernameInput.value = storedUsername;
@@ -330,7 +351,7 @@
     stopButton.addEventListener("click", () => {
       logToUI("Stop button clicked. Attempting to halt operations...");
       stop_signal = true;
-      stopButton.disabled = true;
+      stopButton.disabled = true; // Disable stop button after click
     });
     closeButton.addEventListener("click", () => {
       if (is_processing) {
@@ -342,7 +363,7 @@
           return;
         }
       }
-      uiContainer.style.display = "none";
+      uiContainer.style.display = "none"; // Hide UI instead of removing
     });
   }
 
@@ -351,14 +372,15 @@
       logToUI("Fetch tweets operation cancelled by stop signal.");
       return [];
     }
-    const count = "20";
+    const count = "20"; // Number of tweets to fetch per request
     const current_resource = random_resource;
     const endpoint = "UserTweetsAndReplies";
 
+    // API request parameters
     let variables_obj = {
       userId: user_id,
       count: count,
-      ...(cursor && { cursor: cursor }),
+      ...(cursor && { cursor: cursor }), // Add cursor if it exists
       includePromotedContent: true,
       withCommunity: true,
       withVoice: true,
@@ -398,6 +420,7 @@
     };
     const fieldToggles_obj = { withArticlePlainText: false };
 
+    // Encode parameters for the URL
     const variables_encoded = encodeURIComponent(JSON.stringify(variables_obj));
     const features_encoded = encodeURIComponent(JSON.stringify(features_obj));
     const fieldToggles_encoded = encodeURIComponent(
@@ -453,18 +476,20 @@
             "Authorization error (401/403). Check credentials and ensure you are logged in.",
             true
           );
-          stop_signal = true;
+          stop_signal = true; // Stop on critical auth errors
           return [];
         }
         if (response.status === 429) {
+          // Rate limit handling
           logToUI(
             "Rate limit reached. Waiting 1 minute before retrying.",
             true
           );
           await sleep(60 * 1000);
-          return fetch_tweets(cursor, retry + 1);
+          return fetch_tweets(cursor, retry + 1); // Retry after waiting
         }
         if (retry >= 3) {
+          // Max retries
           logToUI("Max retries reached for fetching tweets. Stopping.", true);
           stop_signal = true;
           return [];
@@ -475,30 +500,35 @@
       }
 
       const data = await response.json();
+      // Navigate through the complex X API response structure to find tweet instructions
       let instructions;
       if (data?.data?.user?.result?.timeline_v2?.timeline?.instructions) {
         instructions = data.data.user.result.timeline_v2.timeline.instructions;
       } else if (data?.data?.user?.result?.timeline?.timeline?.instructions) {
+        // Fallback for older structures
         instructions = data.data.user.result.timeline.timeline.instructions;
       } else {
         logToUI(
           "Unexpected API response structure: Cannot find timeline instructions.",
           true
         );
-        console.dir(data);
+        console.dir(data); // Log the problematic data structure
         return [];
       }
 
       let entries = [];
+      // Find 'TimelineAddEntries' instruction which usually contains the tweets
       const addEntriesInstruction = instructions.find(
         (instr) => instr.type === "TimelineAddEntries"
       );
       if (addEntriesInstruction && addEntriesInstruction.entries) {
         entries = addEntriesInstruction.entries;
       } else {
+        // Fallback if 'TimelineAddEntries' is not the primary way entries are listed
         for (const instruction of instructions) {
           if (instruction.entries && instruction.entries.length > 0) {
             entries.push(...instruction.entries);
+
             break;
           }
         }
@@ -537,6 +567,7 @@
     let next_cursor = null;
     for (const item of entries) {
       if (item.entryId) {
+        // Check for tweet content items
         if (
           item.entryId.startsWith("tweet-") ||
           item.entryId.startsWith("profile-conversation-") ||
@@ -548,10 +579,12 @@
               item
           );
         } else if (item.entryId.startsWith("cursor-bottom-")) {
+          // Check for bottom cursor
           next_cursor =
             item.content?.value ||
-            item.content?.cursor?.value ||
+            item.content?.cursor?.value || // Alternative path for cursor value
             item.content?.itemContent?.value;
+          // Handle specific cursor structure if needed
           if (
             !next_cursor &&
             item.content?.itemContent?.itemType === "TimelineTimelineCursor"
@@ -559,12 +592,14 @@
             next_cursor = item.content.itemContent.value;
           }
         } else if (
+          // Another way cursors might be identified
           item.content?.cursorType === "Bottom" ||
           item.content?.itemContent?.cursorType === "Bottom"
         ) {
           next_cursor = item.content?.value || item.content?.itemContent?.value;
         }
       } else if (item.tweet_results?.result) {
+        // Direct tweet result without entryId wrapper
         findTweetIdsRecursive(item.tweet_results.result);
       }
     }
@@ -582,38 +617,45 @@
         return "finished";
       }
     }
-    return next_cursor || "finished";
+    return next_cursor || "finished"; // Return cursor or "finished"
   }
 
   function findTweetIdsRecursive(obj) {
     if (stop_signal || !obj || typeof obj !== "object") {
+      // Base cases for recursion
       return;
     }
 
     let tweetData = null;
+    // Identify if the current object is a tweet structure
     if (obj.__typename === "Tweet" || obj.rest_id) {
+      // Primary way to identify a tweet object
       tweetData = obj;
     } else if (
       obj.tweet &&
       (obj.tweet.__typename === "Tweet" || obj.tweet.rest_id)
     ) {
+      // Nested tweet object
       tweetData = obj.tweet;
     }
 
     if (tweetData) {
-      const tweet_id_str = tweetData.rest_id || tweetData.legacy?.id_str;
-      const tweet_user_id_str =
+      const tweet_id_str = tweetData.rest_id || tweetData.legacy?.id_str; // Get tweet ID
+      const tweet_user_id_str = // Get user ID associated with the tweet
         tweetData.legacy?.user_id_str ||
         tweetData.core?.user_results?.result?.rest_id;
 
+      // Process user's own tweets
       if (tweet_id_str && tweet_user_id_str === user_id) {
         if (
           delete_options.do_not_remove_pinned_tweet &&
-          tweetData.legacy?.pinned_tweet_ids_str?.includes(tweet_id_str)
+          tweetData.legacy?.pinned_tweet_ids_str?.includes(tweet_id_str) // Check if it's a pinned tweet
         ) {
           logToUI(`Skipping pinned tweet: ${tweet_id_str}`);
         } else if (check_filter_conditions(tweetData, tweet_id_str)) {
+          // Apply filters
           if (!tweets_to_delete.includes(tweet_id_str)) {
+            // Avoid duplicates
             tweets_to_delete.push(tweet_id_str);
             const text =
               tweetData.legacy?.full_text?.substring(0, 70) ||
@@ -623,17 +665,11 @@
         }
       } else if (
         tweet_id_str &&
-        tweetData.legacy?.retweeted_status_result?.result?.legacy
+        tweetData.legacy?.retweeted_status_result?.result?.legacy // Check if it's a retweet by the user
           ?.user_id_str === user_id &&
         delete_options.unretweet
       ) {
-        if (
-          check_filter_conditions(
-            tweetData,
-            tweet_id_str,
-            true /*isRetweetCheck*/
-          )
-        ) {
+        if (check_filter_conditions(tweetData, tweet_id_str, true)) {
           if (!tweets_to_delete.includes(tweet_id_str)) {
             tweets_to_delete.push(tweet_id_str);
             const text =
@@ -647,6 +683,7 @@
       }
     }
 
+    // Recursively search through all properties of the object
     for (const key in obj) {
       if (obj.hasOwnProperty(key)) {
         findTweetIdsRecursive(obj[key]);
@@ -659,7 +696,7 @@
     tweet_id_str,
     isRetweetCheck = false
   ) {
-    const legacy = tweetData.legacy || {};
+    const legacy = tweetData.legacy || {}; // Access legacy tweet data
 
     if (delete_options.tweets_to_ignore.includes(tweet_id_str)) {
       logToUI(`Skipping ignored tweet: ${tweet_id_str}`);
@@ -668,24 +705,31 @@
 
     const text_to_check = legacy.full_text || "";
     const created_at_str = legacy.created_at;
-
     if (created_at_str) {
       const tweet_date = new Date(created_at_str);
       if (
         !(
-          tweet_date >= delete_options.after_date &&
-          tweet_date <= delete_options.before_date
+          // Check if tweet date is outside the specified range
+          (
+            tweet_date >= delete_options.after_date &&
+            tweet_date <= delete_options.before_date
+          )
         )
       ) {
-        if (tweet_date < delete_options.after_date) {
+        if (
+          tweet_date < delete_options.after_date &&
+          !delete_options.delete_specific_ids_only[0]
+        ) {
           logToUI(
             `Tweet ${tweet_id_str} is older than 'After Date'. Stopping further fetching if applicable.`
           );
+
           if (!delete_options.delete_specific_ids_only[0]) {
+            // Only stop if not targeting specific IDs
             stop_signal = true;
           }
         }
-        return false;
+        return false; // Tweet is outside date range
       }
     } else {
       logToUI(
@@ -694,11 +738,26 @@
       );
     }
 
+    if (delete_options.delete_tweets_without_media) {
+      // Check if legacy.entities.media exists and has items (photo, video, gif)
+      const hasMedia =
+        legacy.entities &&
+        legacy.entities.media &&
+        legacy.entities.media.length > 0;
+      if (hasMedia) {
+        logToUI(
+          `Tweet ${tweet_id_str} has media. Skipping due to 'Delete Tweets without Media Only' option.`
+        );
+        return false;
+      }
+    }
+
     if (delete_options.delete_message_with_url_only) {
       const hasUrl = legacy.entities?.urls?.length > 0;
       if (!hasUrl) return false;
     }
 
+    
     if (
       delete_options.match_any_keywords.length > 0 &&
       delete_options.match_any_keywords[0] !== ""
@@ -764,14 +823,14 @@
                 "sec-fetch-dest": "empty",
                 "sec-fetch-mode": "cors",
                 "sec-fetch-site": "same-origin",
-                "x-client-transaction-id": delete_tweet_transaction_id,
+                "x-client-transaction-id": delete_tweet_transaction_id, // Specific transaction ID for delete
                 "x-csrf-token": csrf_token,
                 "x-twitter-active-user": "yes",
                 "x-twitter-auth-type": "OAuth2Session",
                 "x-twitter-client-language": language_code || "en",
               },
               body: JSON.stringify(payload),
-              referrer: `https://x.com/${username}`,
+              referrer: `https://x.com/${username}`, // Referrer for the request
               referrerPolicy: "strict-origin-when-cross-origin",
               mode: "cors",
               credentials: "include",
@@ -780,6 +839,7 @@
 
           if (response.ok) {
             const responseData = await response.json();
+            // Check for errors in the API response
             if (responseData.errors && responseData.errors.length > 0) {
               logToUI(
                 `API error deleting ${tweet_id}: ${responseData.errors[0].message}. Might already be deleted.`,
@@ -802,8 +862,9 @@
                 consecutive_errors++;
               }
             } else if (
+              // Check for successful deletion/unretweet indicators
               responseData.data &&
-              (responseData.data.delete_tweet || responseData.data.unretweet)
+              (responseData.data.delete_tweet || responseData.data.unretweet) // 'unretweet' field for unretweeting
             ) {
               logToUI(
                 `Successfully deleted/unretweeted ${tweet_id} (${
@@ -812,17 +873,20 @@
               );
               deleted_count++;
               success = true;
-              consecutive_errors = 0;
+              consecutive_errors = 0; // Reset error count on success
             } else {
+              // Handle unexpected successful response structure
               logToUI(
                 `Deletion of ${tweet_id} - HTTP .ok but unclear data structure: ${JSON.stringify(
                   responseData
-                ).substring(0, 100)}. Assuming handled.`
+                ).substring(0, 100)}. Assuming handled.`,
+                true
               );
-              success = true;
+              success = true; // Assume handled to avoid retrying indefinitely
               consecutive_errors = 0;
             }
           } else {
+            // Handle non-OK HTTP responses
             const errorText = await response.text();
             logToUI(
               `Failed to delete ${tweet_id}. Status: ${
@@ -831,33 +895,37 @@
               true
             );
             if (response.status === 401 || response.status === 403) {
+              // Auth error
               logToUI("Auth error during delete. Stopping.", true);
               stop_signal = true;
               break;
             }
             if (response.status === 404) {
+              // Not found, assume already deleted
               logToUI(
                 `Tweet ${tweet_id} not found (404). Assuming already deleted.`
               );
               success = true;
               consecutive_errors = 0;
             } else if (response.status === 429) {
+              // Rate limit
               logToUI("Rate limit on delete. Waiting 1 minute.", true);
-              await sleep(60 * 1000);
-              continue;
+              await sleep(60 * 1000); // Wait and retry current tweet
+              continue; // Skip to next iteration of while loop for current tweet
             } else {
               retry++;
               consecutive_errors++;
-              if (retry < 3) await sleep(5000 * retry);
+              if (retry < 3) await sleep(5000 * retry); // Exponential backoff for retries
             }
           }
         } catch (error) {
+          // Network or other errors
           logToUI(`Network error deleting ${tweet_id}: ${error.message}`, true);
           retry++;
           consecutive_errors++;
           if (retry < 3) await sleep(5000 * retry);
         }
-      }
+      } // End of retry while loop
 
       if (!success && !stop_signal) {
         logToUI(
@@ -865,15 +933,16 @@
           true
         );
       }
+      // Pause if too many consecutive errors
       if (consecutive_errors >= 5 && !stop_signal) {
         logToUI(
           "Too many consecutive deletion failures. Pausing for 2 minutes.",
           true
         );
         await sleep(2 * 60 * 1000);
-        consecutive_errors = 0;
+        consecutive_errors = 0; // Reset after pause
       }
-      if (!stop_signal) await sleep(Math.random() * 500 + 300);
+      if (!stop_signal) await sleep(Math.random() * 500 + 300); // Short random delay between deletions
     }
     logToUI(
       `Deletion batch finished. Processed ${deleted_count} of ${id_list.length} targeted tweets.`
@@ -888,10 +957,12 @@
     stop_signal = false;
     tweets_to_delete = [];
 
+    // Get authentication details from UI
     authorization = authTokenInput.value.trim();
     client_tid = clientIdInput.value.trim();
     username = usernameInput.value.trim();
 
+    // Validate required inputs
     if (!authorization || !client_tid || !username) {
       logToUI(
         "Error: Bearer Token, Client ID, and Username are all required!",
@@ -903,16 +974,18 @@
       stopButton.disabled = true;
       return;
     }
-    // Save authentication details to local storage
+    // Save auth details to local storage
     localStorage.setItem(BEARER_TOKEN_STORAGE_KEY, authorization);
     logToUI("Bearer Token saved to local storage.");
-    localStorage.setItem(USERNAME_STORAGE_KEY, username); // Save username
+    localStorage.setItem(USERNAME_STORAGE_KEY, username);
     logToUI("Username saved to local storage.");
 
+    // Ensure Bearer token format
     if (!authorization.toLowerCase().startsWith("bearer ")) {
       authorization = "Bearer " + authorization;
     }
 
+    // Retrieve CSRF token and User ID
     csrf_token = getCookie("ct0");
     const twidCookie = getCookie("twid");
     let temp_user_id = null;
@@ -960,41 +1033,45 @@
         ua = navigator.userAgentData.brands
           .map((brand) => `"${brand.brand}";v="${brand.version}"`)
           .join(", ");
-        ua += `, "${highEntropyValues.platform}";v="${highEntropyValues.platformVersion}"`;
+        ua += `, "${highEntropyValues.platform}";v="${highEntropyValues.platformVersion}"`; // Append platform info
       } catch (e) {
+        // Fallback if high-entropy values fail
         ua =
           navigator.userAgent ||
           `"Chromium";v="100", "Not A;Brand";v="99", "Google Chrome";v="100"`;
       }
     } else {
+      // Fallback to standard userAgent
       ua =
         navigator.userAgent ||
         `"Chromium";v="100", "Not A;Brand";v="99", "Google Chrome";v="100"`;
     }
     language_code = navigator.language
-      ? navigator.language.split("-")[0]
+      ? navigator.language.split("-")[0] // Get primary language code
       : "en";
 
     delete_options.unretweet = unretweetCheckbox.checked;
     delete_options.do_not_remove_pinned_tweet = keepPinnedCheckbox.checked;
     delete_options.delete_message_with_url_only = urlOnlyCheckbox.checked;
+    delete_options.delete_tweets_without_media =
+      deleteWithoutMediaCheckbox.checked;
 
     const keywordsRaw = keywordsInput.value.trim();
     delete_options.match_any_keywords = keywordsRaw
       ? keywordsRaw
           .split(",")
           .map((k) => k.trim().toLowerCase())
-          .filter((k) => k)
-      : [""];
+          .filter((k) => k) // Process keywords
+      : [""]; // Default to empty if no keywords
 
     const ignoreIdsRaw = ignoreIdsInput.value.trim();
     delete_options.tweets_to_ignore = ignoreIdsRaw
       ? ignoreIdsRaw
           .split(/[\s,]+/)
           .map((id) => id.trim())
-          .filter((id) => id)
+          .filter((id) => id) // Process ignored IDs
       : [];
-    localStorage.setItem(IGNORE_IDS_STORAGE_KEY, ignoreIdsRaw);
+    localStorage.setItem(IGNORE_IDS_STORAGE_KEY, ignoreIdsRaw); // Save ignored IDs
     if (ignoreIdsRaw) {
       logToUI("'Tweets to Ignore' saved to local storage.");
     }
@@ -1007,6 +1084,7 @@
           .filter((id) => id)
       : [""];
 
+    // Parse date inputs, providing defaults if empty
     const afterDateVal = afterDateInput.value;
     delete_options.after_date = afterDateVal
       ? new Date(afterDateVal + "T00:00:00Z")
@@ -1019,13 +1097,15 @@
     logToUI(
       "Options configured: " +
         JSON.stringify(
+          // Log configured options for debugging
           delete_options,
-          (key, value) => (value instanceof Date ? value.toISOString() : value),
+          (key, value) => (value instanceof Date ? value.toISOString() : value), // Serialize dates properly
           2
         )
     );
 
     try {
+      // If specific IDs are provided, only delete those
       if (
         delete_options.delete_specific_ids_only.length > 0 &&
         delete_options.delete_specific_ids_only[0] !== ""
@@ -1040,7 +1120,6 @@
         let current_cursor = null;
         let fetch_count = 0;
         const MAX_FETCHES = 200;
-
         while (
           current_cursor !== "finished" &&
           !stop_signal &&
@@ -1064,7 +1143,6 @@
               `Found ${tweets_to_delete.length} tweets in this batch to delete.`
             );
             await delete_tweets_api([...tweets_to_delete]);
-            tweets_to_delete = [];
           } else {
             logToUI("No tweets matching criteria in this batch.");
           }
@@ -1087,7 +1165,6 @@
       is_processing = false;
       startButton.disabled = false;
       stopButton.disabled = true;
-      stop_signal = false;
     }
   }
 
@@ -1114,7 +1191,7 @@
     }
   } else {
     console.warn(
-      "XDeleter script is designed to run on x.com or twitter.com domains for full functionality (cookie access)."
+      "Use x.com/twitter.com domain."
     );
     if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", init);
