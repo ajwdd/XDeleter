@@ -15,26 +15,28 @@ No matter your need XDeleter is the perfect fit.
 
 1. Navigate to your profile's Replies page: https://www.x.com/yourusername/with_replies.
 
-2. Open the browser's console:
+2. Open the browser's console and navigate to "Network":
 
    - Linux, Windows, ChromeOS: <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>J</kbd>
    - macOS: <kbd>Cmd</kbd> + <kbd>Option</kbd> + <kbd>J</kbd>
 
-3. Copy the entirety of `XDeleter.js` and paste into the console, press <kbd>Enter.
+3. Refresh the page.
 
-4. Locate Bearer Token.
+4. Copy the entirety of `XDeleter.js` and paste into the console, press <kbd>Enter.
+
+5. Locate Bearer Token.
 
    ![authtoken](images/authtoken.png)
 
-5. Locate Client ID.
+6. Locate Client ID.
 
    ![xclientid](images/xclientid.png)
 
-6. Enter username.
+7. Enter username.
 
-7. Select options.
+8. Select options.
 
-8. Click start.
+9. Click the start button.
 
 ## 💾 Script:
 
