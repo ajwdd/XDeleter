@@ -28,7 +28,7 @@
     before_date: new Date("2100-01-01"),
   };
 
-  const random_resource = "dGUkXXo_EoCL_NimyHrJ-Q";
+  const random_resource = "Hk4KlJ-ONjlJsucqR55P7g";
   const delete_tweet_graphql_id = "VaenaVgh5q5ih7kvyVjgtg";
   const delete_tweet_transaction_id =
     "LuSa1GYxAMxWEugf+FtQ/wjCAUkipMAU3jpjkil3ujj7oq6munDCtNaMaFmZ8bcm7CaNvi4GIXj32jp7q32nZU8zc5CyLw";
