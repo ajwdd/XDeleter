@@ -1,6 +1,9 @@
 # XDeleter 🗑️
-
 [![JavaScript](https://img.shields.io/badge/JavaScript-323330?style=flat&logo=javascript)](https://en.wikipedia.org/wiki/Brendan_Eich) [![Stars](https://img.shields.io/github/stars/ajwdd/XDeleter.svg?style=flat)](https://github.com/ajwdd/XDeleter/stargazers) [![Size](https://img.shields.io/github/repo-size/ajwdd/XDeleter)](https://github.com/ajwdd/XDeleter) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![IsMaintained](https://img.shields.io/badge/Maintained%3F-yes-blue.svg)](https://github.com/ajwdd/XDeleter/activity)
+
+## CURRENT STATUS: NOT WORKING
+I'm working on a new program from the ground up to fix it.
+ETA: Early July
 
 Want to rebrand? Made some bad decisions? Change your position?
 
